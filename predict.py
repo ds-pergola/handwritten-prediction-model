@@ -1,6 +1,6 @@
 from keras.preprocessing.image import load_img
 from keras.preprocessing.image import img_to_array
-from keras.models import load_model
+from tensorflow.keras.models import load_model
 import tensorflow as tf
 import time
 import os
@@ -9,15 +9,18 @@ import urllib
 import pathlib 
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
+#Disable GPU and force TF to use CPU only
+tf.config.set_visible_devices([], 'GPU')
+os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
 
 class SudokuPredict():
 
     def __init__(self, file_name=None, version=None):
         self.version = version if version is not None else os.environ['SUDOKU_MODEL_VERSION']
         self.model_file_name = file_name if file_name is not None else os.environ['SUDOKU_MODEL_FILE_NAME']
-        self.model = load_model('model/' + self.model_file_name)
+        print(f"Model will be loaded: {self.model_file_name} with version: {self.version}")
 
-        print("Model loaded: {} version: {}".format(self.model_file_name, self.version))
+        self.model = load_model('model/' + self.model_file_name)
 
     def __load_image_from_local__(self, filepath):
         # load the image from File
@@ -56,6 +59,8 @@ class SudokuPredict():
         img = img.reshape(1, 28, 28, 1)
         # prepare pixel data
         img = img.astype('float32')
+        # invert colors
+        img = (255.0 - img)
         img = img / 255.0
 
         return img
