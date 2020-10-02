@@ -19,8 +19,11 @@ RUN pip install gunicorn
 
 # This default value facilitates local development.
 ENV PORT 8080
+# Default Model variables
 ENV SUDOKU_MODEL_FILE_NAME 'sudoku_v1.h5'
 ENV SUDOKU_MODEL_VERSION 'v1'
+
+#Force TF to work only with CPU
 ENV CUDA_VISIBLE_DEVICES "-1"
 
 

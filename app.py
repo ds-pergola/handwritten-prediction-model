@@ -61,7 +61,7 @@ def switch_model():
                 model_filename = flask.request.form["model_filename"]
                 model_version = flask.request.form["model_version"]
 
-                if download_modal(model_filename):
+                if download_model(model_filename):
 
                     if os.path.exists("model/" + model_filename):
                         os.environ['SUDOKU_MODEL_FILE_NAME'] = model_filename
@@ -83,7 +83,7 @@ def switch_model():
 
     return flask.jsonify(data)
 
-@app.route("/test_parameters", methods=["POST"])
+@app.route("/test_parameters", methods=["POST", "GET"])
 def test_parameters():
     if DEBUG: print("Start test_parameters")
     data = {"success": True}
@@ -93,11 +93,12 @@ def test_parameters():
 
     return flask.jsonify(data)
 
-def download_modal(model_filename):
+def download_model(model_filename):
     try:
-        client = storage.Client() 
+        client = storage.Client()   
         bucket = client.get_bucket("dsp-sudoku")
         blob = bucket.blob('model_storage/' + model_filename)
+
         blob.download_to_filename('model/' + model_filename)
         print(f"Model downloaded from model_storage: {model_filename}")
         return True
@@ -105,13 +106,21 @@ def download_modal(model_filename):
         return False
 
 def init():
-    print(("Loading Keras model and Flask starting server..."
-            "please wait until server has fully started"))
+    print("Loading Keras model and  starting server...")
+
+    model_filename = os.environ['SUDOKU_MODEL_FILE_NAME']
+    model_version = os.environ['SUDOKU_MODEL_VERSION']
+
     print(f"ENV SUDOKU_MODEL_FILE_NAME: {os.environ['SUDOKU_MODEL_FILE_NAME']}")
     print(f"ENV SUDOKU_MODEL_VERSION: {os.environ['SUDOKU_MODEL_VERSION']}")
 
-    global sudoku
-    sudoku = predict.SudokuPredict()
+    if download_model(model_filename):
+        global sudoku
+        sudoku = predict.SudokuPredict(file_name=model_filename, version=model_version)
+    else:
+        raise Exception("Model File doesn't exist on model_storage({})".format(model_filename))
+
+    
 
 #Used while testing locally with flask
 if __name__ == "__main__":
