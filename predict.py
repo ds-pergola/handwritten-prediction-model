@@ -15,7 +15,7 @@ os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
 
 class SudokuPredict():
 
-    def __init(self, file_name=None, version=None):
+    def __init__(self, file_name=None, version=None):
         self.version = version if version is not None else os.environ['SUDOKU_MODEL_VERSION']
         self.model_file_name = file_name if file_name is not None else os.environ['SUDOKU_MODEL_FILE_NAME']
         print(f"Model will be loaded: {self.model_file_name} with version: {self.version}")
