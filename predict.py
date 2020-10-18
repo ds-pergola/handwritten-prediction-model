@@ -7,11 +7,16 @@ import os
 from io import BytesIO
 import urllib
 import pathlib 
+import pymongo
+from datetime import datetime
+from dotenv import load_dotenv
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 #Disable GPU and force TF to use CPU only
 tf.config.set_visible_devices([], 'GPU')
 os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
+
+load_dotenv(verbose=True, override=True)
 
 class SudokuPredict():
 
@@ -22,9 +27,16 @@ class SudokuPredict():
 
         self.model = load_model('model/' + self.model_file_name)
 
+        mongo_client = pymongo.MongoClient(os.getenv('MONGO_URI'))
+        self.mongo_db = mongo_client.sudoku
+
+        self.log_doc = {}
+
     def __load_image_from_local(self, filepath):
         # load the image from File
         img = load_img(filepath, color_mode = "grayscale", target_size=(28, 28))
+        self.log_doc["loaded_img_colormode"] = "grayscale"
+        self.log_doc["loaded_img_target_size"] = (28, 28)
         return img
 
     def __load_image_from_URL(self, URL):
@@ -48,13 +60,15 @@ class SudokuPredict():
 
         pathlib.Path(temp_filename).write_bytes(image.getbuffer())
         img = self.__load_image_from_local(temp_filename)
-
+        
         os.remove(temp_filename)
         return img
     
     def __preprocess_image(self, image):
         # convert to array
         img = img_to_array(image)
+        self.log_doc["img_to_array"] = img.tolist()
+
         # reshape into a single sample with 1 channel
         img = img.reshape(1, 28, 28, 1)
         # prepare pixel data
@@ -62,16 +76,23 @@ class SudokuPredict():
         # invert colors
         img = (255.0 - img)
         img = img / 255.0
+        self.log_doc["post_process"] = img.tolist()
 
         return img
 
     def __predict(self, img):
-        digit = self.model.predict_classes(img)
+        result = self.model.predict(img)[0].tolist()
+        self.log_doc["predict_result"] = result
+
+        prob = max(result)
+        self.log_doc["predict_prob"] = float(prob)
+
+        digit = result.index(prob)
+        self.log_doc["predict_digit"] = int(digit)
+
+        #digit = self.model.predict_classes(img)
         
-        if len(digit) > 0:
-            return int(digit[0])
-        else:
-            raise Exception("Prediction Failed")
+        return (int(digit), float(prob))
 
     def predict_local(self, filepath):
         img = self.__load_image_from_local(filepath)
@@ -85,12 +106,26 @@ class SudokuPredict():
 
         return self.__predict(img)
     
-    def predict_memory(self, bytesio_image):
+    def predict_memory(self, bytesio_image, transaction_id=None):
+        self.__log_init(transaction_id)
+
         img = self.__load_image_from_memory(bytesio_image)
         img = self.__preprocess_image(img)
+        result = self.__predict(img)
 
-        return self.__predict(img)
+        self.__save_log()
+        return result
     
     def __generate_temp_filename(self):
         return 'tmp/' + str(int(time.time()*1000000)) + ".png"
     
+    def __save_log(self):
+        self.mongo_db.predictions_log.insert_one(self.log_doc)
+        pass
+    
+    def __log_init(self, transaction_id):
+        self.log_doc = {}
+        self.log_doc["transaction_id"] = transaction_id
+        self.log_doc["model_file_name"] = self.model_file_name
+        self.log_doc["version"] = self.version
+        self.log_doc["datetime"] = datetime.utcnow()

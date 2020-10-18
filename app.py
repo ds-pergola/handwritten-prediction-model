@@ -31,13 +31,11 @@ def api_predict():
             # read the image from POST request
             image = flask.request.files["image"].read()
 
-            #predicted_digit = sudoku.predict_local('3.png')
-
             # classify the input image
-            predicted_digit = sudoku.predict_memory(io.BytesIO(image))
+            predicted = sudoku.predict_memory(io.BytesIO(image), transaction_id)
 
-            data["predicted_digit"] = predicted_digit
-            data["predicted_prob"] = None
+            data["predicted_digit"] = predicted[0]
+            data["predicted_prob"] = predicted[1]
             data["model_version"] = sudoku.version
             data["transaction_id"] = transaction_id
 
